@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using HoudiniEngineUnity;
@@ -43,25 +43,15 @@ public class Terrain_Notifier : MonoBehaviour
 		}
 		Debug.Log("HEU attrib store found");
 
-		// // Query for the health attribute (HEU_OutputAttribute).
-		// // HEU_OutputAttribute contains the attribute info such as name, class, storage, and array of data.
-		// // Use the name to get HEU_OutputAttribute.
-		// // Can use HEU_OutputAttribute._type to figure out what the actual data type is.
-		// // Note that data is stored in array. The size of the array corresponds to the data type.
-		// // For instances, the size of the array is the point cound.
-		// if (heightAttr != null)
-		// {
-		// 	//Debug.LogFormat("Found water attribute with data for {0} instances.", heightAttr._floatValues.Length);
 
-		// 	for(int i = 0; i < heightAttr._floatValues.Length; ++i)
-		// 	{
-		// 		//Debug.LogFormat("{0} = {1}", i, heightAttr._floatValues[i]);
-		// 	}
-		// }
 
-		// Example of how to map the attribute array values to instances
-		// Get the generated instances as children of this gameobject.
-		// Note that this will include the current parent as first element (so its number of children + 1 size)
+
+
+
+
+
+
+
 		Transform[] childTrans = transform.GetComponentsInChildren<Transform>(false);
 		int numChildren = childTrans.Length;
 		// Starting at 1 to skip parent transform
@@ -70,6 +60,8 @@ public class Terrain_Notifier : MonoBehaviour
 		HEU_OutputAttribute neighborAttr = attrStore.GetAttribute("neighbours");
 
 
+
+		////Pull in attributes from the Houdini heightfield terrain. These are stored on the attrStore.
 		HEU_OutputAttribute waterAttr = attrStore.GetAttribute("water");
 		HEU_OutputAttribute debrisAttr = attrStore.GetAttribute("debris");
 		HEU_OutputAttribute heightAttr = attrStore.GetAttribute("height");
@@ -78,21 +70,21 @@ public class Terrain_Notifier : MonoBehaviour
 		HEU_OutputAttribute noiseAttr = attrStore.GetAttribute("noise");
 
 
+		///Issue when editing where the asset needs to be recooked
 		Debug.Log(colorAttr._floatValues.Length);
 
 		
-        //Debug.Log(colorAttr._floatValues.Length);
-        //Debug.Log(neighborAttr._intValues.Length);
-        //Debug.Log(neighborAttr._intValues[0]);
 
+
+		//Loop through all generated nodes
 		for (int i = 1; i < numChildren; ++i)
 		{
-			//Debug.LogFormat("Instance {0}: name = {1}", i, childTrans[i].name);
+			
 
-			// Can use the name to match up indices
 			string instanceName = "Instance" + i;
 			if (childTrans[i].name.EndsWith(instanceName))
 			{
+
 				// Now apply health as scale value
 				Vector3 scale = childTrans[i].localScale;
 
@@ -100,13 +92,16 @@ public class Terrain_Notifier : MonoBehaviour
 				scale.y = heightAttr._floatValues[i - 1];
 				childTrans[i].localScale = scale;
 
-                //Colorize by point color
+                //Colorize by point color from Houdini
                 childTrans[i].GetComponent<Renderer>().material.SetColor("_Color", new Color(colorAttr._floatValues[(i*3)-3],colorAttr._floatValues[(i*3)-2],colorAttr._floatValues[(i*3)-1]));
 
 
 
 
 				////HARD CODED, likely a limit by the variable vec limits
+
+
+				///Generate node paths. These are made in houdini using the nearpoints fn
 				Node childNode = childTrans[i].GetComponent<Node>();
 				childNode.ConnectsTo = new Node[4];
 				childNode.ConnectsTo[0] = childTrans[neighborAttr._intValues[(i*4)-4]+1].GetComponent<Node>();
@@ -116,9 +111,11 @@ public class Terrain_Notifier : MonoBehaviour
 
 
 
-
+				///Create node weight array and init
 				float[] _inputValues = waterAttr._floatValues;
 
+
+				//Fill array based on which weight type is selected in editor
 				switch (_chosenWeightType)
 				{
 					case weightType.none:
@@ -158,8 +155,7 @@ public class Terrain_Notifier : MonoBehaviour
 				
 
 
-                //Pull neighbours
-                //childTrans[i].GetComponent<Node>().ConnectsTo = new GameObject[];
+                
 			}
 		}
 	}
