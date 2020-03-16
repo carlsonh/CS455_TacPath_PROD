@@ -3,9 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using HoudiniEngineUnity;
 
+
+//////In editor, pathfinder tries to take the lightest-colored path
+
 [ExecuteInEditMode]
 public class Terrain_Notifier : MonoBehaviour
 {
+	///Variables
 
 	public bool bInvertedWeights = true;
 
@@ -15,7 +19,7 @@ public class Terrain_Notifier : MonoBehaviour
 
 
 
-
+	///Functionss
 
 	void Update()
 	{
@@ -26,7 +30,7 @@ public class Terrain_Notifier : MonoBehaviour
 	}
 
 	
-
+	///Called on Asset recook or in edit mode
     void InstancerCallback()
 	{
 
@@ -46,33 +50,30 @@ public class Terrain_Notifier : MonoBehaviour
 
 
 
-
-
-
-
-
-
+		//Collect all nodes from HEngine
 		Transform[] childTrans = transform.GetComponentsInChildren<Transform>(false);
 		int numChildren = childTrans.Length;
 		// Starting at 1 to skip parent transform
 
+
+
+
+		////Pull in attributes from the Houdini heightfield terrain. These are stored on the attrStore
+
 		HEU_OutputAttribute colorAttr = attrStore.GetAttribute("Cd");
 		HEU_OutputAttribute neighborAttr = attrStore.GetAttribute("neighbours");
 
-
-
-		////Pull in attributes from the Houdini heightfield terrain. These are stored on the attrStore.
+		//Attributes used for weight generation (height also used for scaling)
+		HEU_OutputAttribute heightAttr = attrStore.GetAttribute("height");
 		HEU_OutputAttribute waterAttr = attrStore.GetAttribute("water");
 		HEU_OutputAttribute debrisAttr = attrStore.GetAttribute("debris");
-		HEU_OutputAttribute heightAttr = attrStore.GetAttribute("height");
 		HEU_OutputAttribute sedimentAttr = attrStore.GetAttribute("sediment");
 		HEU_OutputAttribute bedrockAttr = attrStore.GetAttribute("bedrock");
 		HEU_OutputAttribute noiseAttr = attrStore.GetAttribute("noise");
 
 
-		///Issue when editing where the asset needs to be recooked
+		///Check for issue when editing where the asset needs to be recooked
 		Debug.Log(colorAttr._floatValues.Length);
-
 		
 
 
@@ -80,7 +81,7 @@ public class Terrain_Notifier : MonoBehaviour
 		for (int i = 1; i < numChildren; ++i)
 		{
 			
-
+			///Make sure the node exists
 			string instanceName = "Instance" + i;
 			if (childTrans[i].name.EndsWith(instanceName))
 			{
@@ -92,16 +93,15 @@ public class Terrain_Notifier : MonoBehaviour
 				scale.y = heightAttr._floatValues[i - 1];
 				childTrans[i].localScale = scale;
 
-                //Colorize by point color from Houdini
+                //Colorize by point color from Houdini //!!This generates a unique material per node
                 childTrans[i].GetComponent<Renderer>().material.SetColor("_Color", new Color(colorAttr._floatValues[(i*3)-3],colorAttr._floatValues[(i*3)-2],colorAttr._floatValues[(i*3)-1]));
 
 
 
 
-				////HARD CODED, likely a limit by the variable vec limits
+				////Due to vector dim limits, this cannot have more paths w/o adding more vec attribs
 
-
-				///Generate node paths. These are made in houdini using the nearpoints fn
+				///Generate node paths. These are made in Houdini using the nearpoints fn
 				Node childNode = childTrans[i].GetComponent<Node>();
 				childNode.ConnectsTo = new Node[4];
 				childNode.ConnectsTo[0] = childTrans[neighborAttr._intValues[(i*4)-4]+1].GetComponent<Node>();
@@ -112,15 +112,14 @@ public class Terrain_Notifier : MonoBehaviour
 
 
 				///Create node weight array and init
-				float[] _inputValues = waterAttr._floatValues;
+				float[] _inputValues = new float[waterAttr._floatValues.Length];
 
 
 				//Fill array based on which weight type is selected in editor
 				switch (_chosenWeightType)
 				{
 					case weightType.none:
-						_inputValues = new float[waterAttr._floatValues.Length];
-						_inputValues.Init(1f);
+						_inputValues.Init(1f); ///This was changed outside of unity and is untested, line 116 init also used to be in here
 						break;
 
 					case weightType.water:
@@ -149,12 +148,13 @@ public class Terrain_Notifier : MonoBehaviour
 				}
 
 
-				
+
+				///0-1 the weight (has issues with noises, somehow generating negative numbers)
 				float _normalizedValue = (_inputValues[i-1] - Mathf.Min(_inputValues)) / Mathf.Max(_inputValues); //0-1'd
+
+
+				//Set the node's weight, checking if editor wants weights inverted
 				childNode.ownWeight = bInvertedWeights ?  1f - _normalizedValue : _normalizedValue;
-				
-
-
                 
 			}
 		}
